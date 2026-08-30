@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#121212">
+  <meta name="description" content="출근길 10분, 4개 국어(영어/중국어/일본어/스페인어) 단어를 소리로 따라 읽는 무료 섀도잉 학습 웹앱">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png">
+  <title>출근길 10분 섀도잉</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background-color: #121212;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    .card {
+      background-color: #1e1e1e;
+      border-radius: 20px;
+      padding: 30px 20px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    h1 { font-size: 1.5rem; color: #4da6ff; margin-bottom: 6px; }
+    #streak { font-size: 0.9rem; color: #ff9f4d; margin-bottom: 14px; }
+    #day-select {
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #3a3a3a;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 0.95rem;
+      margin-bottom: 16px;
+    }
+    #status { font-size: 1.1rem; color: #aaa; margin-bottom: 20px; }
+    #text-display {
+      font-size: 1.3rem;
+      font-weight: bold;
+      min-height: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      word-break: keep-all;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+    #progress-track {
+      width: 100%;
+      height: 6px;
+      background: #2a2a2a;
+      border-radius: 3px;
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: #4da6ff;
+      transition: width 0.3s ease;
+    }
+    button {
+      background-color: #4da6ff;
+      color: #121212;
+      border: none;
+      padding: 18px 40px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      border-radius: 50px;
+      width: 100%;
+      cursor: pointer;
+    }
+    button:active { transform: scale(0.98); }
+    footer {
+      margin-top: 18px;
+      font-size: 0.75rem;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>🚗 출근길 10분 섀도잉</h1>
+  <div id="streak">오늘도 10분, 시작해볼까요?</div>
+  <select id="day-select" aria-label="학습일 선택"></select>
+  <div id="status">준비 완료</div>
+  <div id="text-display">아래 버튼을 누르면 출근길 10분 학습이 시작됩니다.</div>
+  <div id="progress-track"><div id="progress-bar"></div></div>
+  <button id="btn">▶ 학습 시작하기</button>
+  <footer>화면이 꺼지면 음성이 계속 재생되지 않을 수 있어요. 운전 중에는 거치대에 화면이 보이도록 두세요.</footer>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
