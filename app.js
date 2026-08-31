@@ -39,6 +39,9 @@ let isPlaying = false;
 let currentStep = 0;
 let sequence = [];
 let wakeLock = null;
+let noSleepVideo = null;
+let noSleepCanvasTimer = null;
+let wakeLockRetryTimer = null;
 
 function populateDaySelect() {
   daySelect.innerHTML = "";
@@ -87,14 +90,87 @@ function sleep(ms) {
   });
 }
 
+// Wake Lock API를 지원하지 않는 브라우저(구형 iOS Safari, 카카오톡/네이버 인앱 브라우저 등)를
+// 위한 보조 수단: 화면 밖 1x1 캔버스를 영상으로 스트리밍해 계속 재생시키면
+// 대부분의 모바일 브라우저가 "영상 재생 중"으로 인식해 화면을 끄지 않습니다.
+function startNoSleepVideo() {
+  if (noSleepVideo) return;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    const ctx = canvas.getContext("2d");
+    let tick = 0;
+    noSleepCanvasTimer = setInterval(() => {
+      tick = (tick + 1) % 2;
+      ctx.fillStyle = tick ? "#000000" : "#010101";
+      ctx.fillRect(0, 0, 1, 1);
+    }, 1000);
+
+    const stream = canvas.captureStream ? canvas.captureStream(1) : null;
+    if (!stream) return;
+
+    const video = document.createElement("video");
+    video.muted = true;
+    video.setAttribute("muted", "");
+    video.setAttribute("playsinline", "");
+    video.setAttribute("webkit-playsinline", "");
+    video.style.position = "fixed";
+    video.style.width = "1px";
+    video.style.height = "1px";
+    video.style.opacity = "0";
+    video.style.pointerEvents = "none";
+    video.srcObject = stream;
+    document.body.appendChild(video);
+    video.play().catch(() => {});
+    noSleepVideo = video;
+  } catch (e) {
+    // 지원하지 않는 브라우저에서는 조용히 무시합니다.
+  }
+}
+
+function stopNoSleepVideo() {
+  if (noSleepCanvasTimer) {
+    clearInterval(noSleepCanvasTimer);
+    noSleepCanvasTimer = null;
+  }
+  if (noSleepVideo) {
+    noSleepVideo.pause();
+    if (noSleepVideo.srcObject) {
+      noSleepVideo.srcObject.getTracks().forEach((t) => t.stop());
+    }
+    noSleepVideo.remove();
+    noSleepVideo = null;
+  }
+}
+
 async function requestWakeLock() {
+  startNoSleepVideo();
   try {
     if ("wakeLock" in navigator) {
       wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener("release", () => {
+        wakeLock = null;
+      });
     }
   } catch (e) {
-    // 화면 유지 실패는 치명적이지 않으므로 무시합니다.
+    // Wake Lock API 실패는 noSleepVideo 로 보완하므로 무시합니다.
   }
+
+  if (wakeLockRetryTimer) clearInterval(wakeLockRetryTimer);
+  wakeLockRetryTimer = setInterval(() => {
+    if (isPlaying && !wakeLock && "wakeLock" in navigator && document.visibilityState === "visible") {
+      navigator.wakeLock
+        .request("screen")
+        .then((lock) => {
+          wakeLock = lock;
+          wakeLock.addEventListener("release", () => {
+            wakeLock = null;
+          });
+        })
+        .catch(() => {});
+    }
+  }, 10000);
 }
 
 function releaseWakeLock() {
@@ -102,6 +178,11 @@ function releaseWakeLock() {
     wakeLock.release().catch(() => {});
     wakeLock = null;
   }
+  if (wakeLockRetryTimer) {
+    clearInterval(wakeLockRetryTimer);
+    wakeLockRetryTimer = null;
+  }
+  stopNoSleepVideo();
 }
 
 function todayKey() {
@@ -188,8 +269,9 @@ daySelect.addEventListener("change", () => {
 btn.addEventListener("click", togglePlay);
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && isPlaying && wakeLock === null) {
-    requestWakeLock();
+  if (document.visibilityState === "visible" && isPlaying) {
+    if (wakeLock === null) requestWakeLock();
+    if (noSleepVideo && noSleepVideo.paused) noSleepVideo.play().catch(() => {});
   }
 });
 
