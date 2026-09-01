@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#121212">
+  <meta name="description" content="8월 한 달간 공부한 비즈니스 중국어 학습 로그를 정리한 전자책. 문장마다 3번씩 소리내어 읽어주는 기능 포함.">
+  <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+  <link rel="icon" href="../icons/icon-192.png">
+  <title>비즈니스 중국어 한 달 정리 전자책</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background-color: #121212;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 16px;
+      line-height: 1.6;
+    }
+    .book {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+    a.back-link {
+      color: #4da6ff;
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+    .book-header {
+      text-align: center;
+      margin: 20px 0 24px;
+    }
+    .book-header h1 {
+      font-size: 1.4rem;
+      color: #4da6ff;
+      margin: 10px 0 4px;
+    }
+    .subtitle {
+      color: #aaa;
+      font-size: 0.9rem;
+      margin: 0;
+    }
+    details.toc {
+      background: #1e1e1e;
+      border-radius: 14px;
+      padding: 6px 16px;
+      margin-bottom: 20px;
+    }
+    details.toc summary {
+      cursor: pointer;
+      padding: 10px 0;
+      font-weight: bold;
+      color: #4da6ff;
+    }
+    #toc-list {
+      list-style: none;
+      margin: 0;
+      padding: 0 0 10px;
+    }
+    #toc-list li button {
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      color: #fff;
+      border: none;
+      border-top: 1px solid #2a2a2a;
+      padding: 10px 4px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+    #toc-list li button .toc-day {
+      color: #ff9f4d;
+      font-weight: bold;
+      margin-right: 6px;
+    }
+    #toc-list li button.active { color: #4da6ff; }
+    .chapter {
+      background: #1e1e1e;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .chapter-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .chapter-nav button {
+      background: #2a2a2a;
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 14px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    .chapter-nav button:disabled { opacity: 0.35; cursor: default; }
+    #chapter-position { color: #888; font-size: 0.8rem; }
+    #chapter-title {
+      font-size: 1.25rem;
+      margin: 4px 0 2px;
+      color: #4da6ff;
+    }
+    #chapter-meta {
+      color: #888;
+      font-size: 0.85rem;
+      margin: 0 0 16px;
+    }
+    .quiz-box, .tip-box, .mission-box {
+      background: #262626;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 18px 0;
+    }
+    .quiz-box h3, .tip-box h3, .mission-box h3 {
+      font-size: 0.9rem;
+      margin: 0 0 8px;
+      color: #ff9f4d;
+    }
+    .quiz-box p, .tip-box p, .mission-box p {
+      font-size: 0.9rem;
+      margin: 0;
+      color: #ddd;
+    }
+    #quiz-reveal {
+      margin-top: 10px;
+      background: #4da6ff;
+      color: #121212;
+      border: none;
+      border-radius: 20px;
+      padding: 7px 16px;
+      font-size: 0.82rem;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    #quiz-a { margin-top: 10px; }
+    .chapter-all-btn {
+      display: block;
+      width: 100%;
+      background: #ff9f4d;
+      color: #121212;
+      border: none;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: bold;
+      cursor: pointer;
+      margin: 4px 0 20px;
+    }
+    .sentence-card {
+      border-top: 1px solid #2a2a2a;
+      padding: 18px 0;
+    }
+    .sentence-card:first-of-type { border-top: none; }
+    .sentence-head {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .sentence-index {
+      color: #ff9f4d;
+      font-weight: bold;
+    }
+    .zh {
+      font-size: 1.15rem;
+      font-weight: bold;
+      margin: 4px 0;
+      word-break: keep-all;
+    }
+    .pinyin {
+      color: #7fc1ff;
+      font-size: 0.9rem;
+      margin: 2px 0 6px;
+    }
+    .ko {
+      color: #ddd;
+      font-size: 0.95rem;
+      margin: 0 0 10px;
+    }
+    .play-btn {
+      background: #4da6ff;
+      color: #121212;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      font-weight: bold;
+      cursor: pointer;
+      margin-bottom: 12px;
+    }
+    .play-btn.playing { background: #ff9f4d; }
+    table.vocab {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.82rem;
+      margin: 8px 0;
+    }
+    table.vocab th, table.vocab td {
+      text-align: left;
+      padding: 5px 6px;
+      border-bottom: 1px solid #2a2a2a;
+      color: #ccc;
+    }
+    table.vocab th { color: #888; font-weight: normal; }
+    .usage-note {
+      font-size: 0.8rem;
+      color: #999;
+      margin: 6px 0 0;
+    }
+    footer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #555;
+      margin-top: 24px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="book">
+  <a class="back-link" href="../index.html">← 출근길 10분 섀도잉으로 돌아가기</a>
+  <div class="book-header">
+    <div style="font-size:2rem;">📖</div>
+    <h1>비즈니스 중국어 한 달 정리</h1>
+    <p class="subtitle" id="range-text">2026.08.14 ~ 2026.08.31 · 13일차 · 39문장</p>
+  </div>
+
+  <details class="toc" open>
+    <summary>📑 목차 (일자별 학습)</summary>
+    <ol id="toc-list"></ol>
+  </details>
+
+  <main class="chapter" id="chapter-view">
+    <div class="chapter-nav">
+      <button id="prev-chapter">← 이전</button>
+      <span id="chapter-position"></span>
+      <button id="next-chapter">다음 →</button>
+    </div>
+    <h2 id="chapter-title"></h2>
+    <p id="chapter-meta"></p>
+
+    <section class="quiz-box" id="quiz-box">
+      <h3>🔁 지난 회차 복습 퀴즈</h3>
+      <p id="quiz-q"></p>
+      <button id="quiz-reveal">정답 보기</button>
+      <p id="quiz-a" hidden></p>
+    </section>
+
+    <button class="chapter-all-btn" id="play-all-btn">🔊 이 챕터 문장 전체 3번씩 듣기</button>
+
+    <section id="sentences"></section>
+
+    <section class="tip-box">
+      <h3>💡 실전 협상 TIP</h3>
+      <p id="tip-text"></p>
+    </section>
+
+    <section class="mission-box">
+      <h3>✅ 오늘의 아웃풋 미션</h3>
+      <p id="mission-text"></p>
+    </section>
+  </main>
+
+  <footer>중국어 문장은 브라우저 내장 TTS(Web Speech API, zh-CN)로 읽어줍니다. 목소리는 기기/브라우저에 따라 달라질 수 있습니다.</footer>
+</div>
+
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
