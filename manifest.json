@@ -1,12 +1,12 @@
 {
-  "name": "출근길 10분 섀도잉",
-  "short_name": "10분 섀도잉",
-  "description": "출근길 10분, 4개 국어 단어를 소리로 따라 읽는 무료 섀도잉 학습 앱",
+  "name": "오늘의 식단 분석",
+  "short_name": "식단 분석",
+  "description": "아침·점심·저녁 식단 사진으로 탄수화물·단백질·지방·칼로리를 분석하는 무료 AI 식단 앱",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#121212",
-  "theme_color": "#121212",
+  "background_color": "#f4f6f4",
+  "theme_color": "#0e7c5f",
   "lang": "ko",
   "orientation": "portrait",
   "icons": [

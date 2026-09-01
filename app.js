@@ -1,283 +1,343 @@
-// 출근길 10분 섀도잉 - 재생 엔진
-const KO = "ko-KR";
+// 오늘의 식단 분석 - 사진 업로드 → AI 영양 분석
+const MEALS = ["breakfast", "lunch", "dinner"];
+const API_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_VERSION = "2023-06-01";
 
-function buildDaySequence(day) {
-  const seq = [];
-  seq.push({ type: "text", lang: KO, text: day.intro });
-  seq.push({ type: "pause", duration: 1000 });
+const NUTRITION_SCHEMA = {
+  type: "object",
+  properties: {
+    food_name: { type: "string", description: "사진 속 음식 이름(들)을 한국어로 간단히" },
+    calories: { type: "number", description: "총 예상 칼로리 (kcal)" },
+    carbs: { type: "number", description: "탄수화물 (g)" },
+    protein: { type: "number", description: "단백질 (g)" },
+    fat: { type: "number", description: "지방 (g)" },
+    confidence: { type: "string", enum: ["low", "medium", "high"] },
+    note: { type: "string", description: "이 식사에 대한 한두 문장짜리 한국어 코멘트" },
+  },
+  required: ["food_name", "calories", "carbs", "protein", "fat", "confidence", "note"],
+  additionalProperties: false,
+};
 
-  day.languages.forEach((l) => {
-    seq.push({ type: "text", lang: KO, text: l.introKo });
-    seq.push({ type: "pause", duration: 500 });
-    seq.push({ type: "text", lang: KO, text: l.sentenceKo });
-    seq.push({ type: "text", lang: l.lang, text: l.sentence, rate: 0.8 });
-    seq.push({ type: "pause", duration: 5000 });
-    seq.push({ type: "text", lang: KO, text: "보통 속도로 듣고 따라 해보세요." });
-    seq.push({ type: "text", lang: l.lang, text: l.sentence, rate: 1.0 });
-    seq.push({ type: "pause", duration: 4000 });
-    seq.push({ type: "text", lang: KO, text: "원어민 속도로 자연스럽게 따라 해보세요." });
-    seq.push({ type: "text", lang: l.lang, text: l.sentence, rate: 1.1 });
-    seq.push({ type: "pause", duration: 4000 });
-    seq.push({ type: "text", lang: KO, text: l.reviewKo });
-    seq.push({ type: "pause", duration: 4000 });
-  });
-
-  seq.push({ type: "text", lang: KO, text: "오늘 배운 4개 국어 대표 단어를 최종 확인합니다." });
-  seq.push({ type: "text", lang: KO, text: day.finalReview });
-  seq.push({ type: "text", lang: KO, text: day.outro });
-  return seq;
-}
-
-const statusEl = document.getElementById("status");
-const textEl = document.getElementById("text-display");
-const btn = document.getElementById("btn");
-const progressBar = document.getElementById("progress-bar");
-const streakEl = document.getElementById("streak");
-const daySelect = document.getElementById("day-select");
-
-let isPlaying = false;
-let currentStep = 0;
-let sequence = [];
-let wakeLock = null;
-let noSleepVideo = null;
-let noSleepCanvasTimer = null;
-let wakeLockRetryTimer = null;
-
-function populateDaySelect() {
-  daySelect.innerHTML = "";
-  DAYS.forEach((day, idx) => {
-    const opt = document.createElement("option");
-    opt.value = idx;
-    opt.textContent = day.title;
-    daySelect.appendChild(opt);
-  });
-}
-
-function loadDay(idx) {
-  sequence = buildDaySequence(DAYS[idx]);
-  currentStep = 0;
-  updateProgress();
-  textEl.innerText = "아래 버튼을 누르면 출근길 10분 학습이 시작됩니다.";
-  statusEl.innerText = "준비 완료";
-  btn.innerText = "▶ 학습 시작하기";
-}
-
-function updateProgress() {
-  const pct = sequence.length ? Math.round((currentStep / sequence.length) * 100) : 0;
-  progressBar.style.width = pct + "%";
-}
-
-function speak(text, lang, rate) {
-  return new Promise((resolve) => {
-    if (!isPlaying) return resolve();
-    const uttr = new SpeechSynthesisUtterance(text);
-    uttr.lang = lang;
-    uttr.rate = rate || 1.0;
-    uttr.onend = resolve;
-    uttr.onerror = resolve;
-    window.speechSynthesis.speak(uttr);
-  });
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => {
-    const start = Date.now();
-    const tick = () => {
-      if (!isPlaying || Date.now() - start >= ms) return resolve();
-      requestAnimationFrame(tick);
-    };
-    tick();
-  });
-}
-
-// Wake Lock API를 지원하지 않는 브라우저(구형 iOS Safari, 카카오톡/네이버 인앱 브라우저 등)를
-// 위한 보조 수단: 화면 밖 1x1 캔버스를 영상으로 스트리밍해 계속 재생시키면
-// 대부분의 모바일 브라우저가 "영상 재생 중"으로 인식해 화면을 끄지 않습니다.
-function startNoSleepVideo() {
-  if (noSleepVideo) return;
-  try {
-    const canvas = document.createElement("canvas");
-    canvas.width = 1;
-    canvas.height = 1;
-    const ctx = canvas.getContext("2d");
-    let tick = 0;
-    noSleepCanvasTimer = setInterval(() => {
-      tick = (tick + 1) % 2;
-      ctx.fillStyle = tick ? "#000000" : "#010101";
-      ctx.fillRect(0, 0, 1, 1);
-    }, 1000);
-
-    const stream = canvas.captureStream ? canvas.captureStream(1) : null;
-    if (!stream) return;
-
-    const video = document.createElement("video");
-    video.muted = true;
-    video.setAttribute("muted", "");
-    video.setAttribute("playsinline", "");
-    video.setAttribute("webkit-playsinline", "");
-    video.style.position = "fixed";
-    video.style.width = "1px";
-    video.style.height = "1px";
-    video.style.opacity = "0";
-    video.style.pointerEvents = "none";
-    video.srcObject = stream;
-    document.body.appendChild(video);
-    video.play().catch(() => {});
-    noSleepVideo = video;
-  } catch (e) {
-    // 지원하지 않는 브라우저에서는 조용히 무시합니다.
-  }
-}
-
-function stopNoSleepVideo() {
-  if (noSleepCanvasTimer) {
-    clearInterval(noSleepCanvasTimer);
-    noSleepCanvasTimer = null;
-  }
-  if (noSleepVideo) {
-    noSleepVideo.pause();
-    if (noSleepVideo.srcObject) {
-      noSleepVideo.srcObject.getTracks().forEach((t) => t.stop());
-    }
-    noSleepVideo.remove();
-    noSleepVideo = null;
-  }
-}
-
-async function requestWakeLock() {
-  startNoSleepVideo();
-  try {
-    if ("wakeLock" in navigator) {
-      wakeLock = await navigator.wakeLock.request("screen");
-      wakeLock.addEventListener("release", () => {
-        wakeLock = null;
-      });
-    }
-  } catch (e) {
-    // Wake Lock API 실패는 noSleepVideo 로 보완하므로 무시합니다.
-  }
-
-  if (wakeLockRetryTimer) clearInterval(wakeLockRetryTimer);
-  wakeLockRetryTimer = setInterval(() => {
-    if (isPlaying && !wakeLock && "wakeLock" in navigator && document.visibilityState === "visible") {
-      navigator.wakeLock
-        .request("screen")
-        .then((lock) => {
-          wakeLock = lock;
-          wakeLock.addEventListener("release", () => {
-            wakeLock = null;
-          });
-        })
-        .catch(() => {});
-    }
-  }, 10000);
-}
-
-function releaseWakeLock() {
-  if (wakeLock) {
-    wakeLock.release().catch(() => {});
-    wakeLock = null;
-  }
-  if (wakeLockRetryTimer) {
-    clearInterval(wakeLockRetryTimer);
-    wakeLockRetryTimer = null;
-  }
-  stopNoSleepVideo();
-}
+const state = {
+  files: {}, // meal -> File
+  results: {}, // meal -> parsed nutrition object
+};
 
 function todayKey() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function markTodayCompleted() {
-  const raw = localStorage.getItem("completedDates");
-  const dates = raw ? JSON.parse(raw) : [];
-  const today = todayKey();
-  if (!dates.includes(today)) dates.push(today);
-  localStorage.setItem("completedDates", JSON.stringify(dates));
-  renderStreak();
+function storageKey() {
+  return `mealLog:${todayKey()}`;
 }
 
-function renderStreak() {
-  const raw = localStorage.getItem("completedDates");
-  const dates = new Set(raw ? JSON.parse(raw) : []);
-  let streak = 0;
-  const cursor = new Date();
-  while (dates.has(cursor.toISOString().slice(0, 10))) {
-    streak += 1;
-    cursor.setDate(cursor.getDate() - 1);
+function loadTodayLog() {
+  const raw = localStorage.getItem(storageKey());
+  return raw ? JSON.parse(raw) : {};
+}
+
+function saveTodayLog(log) {
+  localStorage.setItem(storageKey(), JSON.stringify(log));
+}
+
+function getSettings() {
+  return {
+    apiKey: localStorage.getItem("mealApiKey") || "",
+    presetKey: localStorage.getItem("mealTargetPreset") || "default",
+    model: localStorage.getItem("mealModel") || "claude-opus-5",
+  };
+}
+
+function getTarget() {
+  const { presetKey } = getSettings();
+  return TARGET_PRESETS[presetKey] || TARGET_PRESETS.default;
+}
+
+// ---- 이미지 리사이즈 (전송 용량/토큰 절약) ----
+function fileToResizedBase64(file, maxDim = 1024, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("파일을 읽을 수 없어요."));
+    reader.onload = () => {
+      img.onerror = () => reject(new Error("이미지를 불러올 수 없어요."));
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        resolve(dataUrl.split(",")[1]);
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function analyzeMeal(meal, base64Image) {
+  const { apiKey, model } = getSettings();
+  if (!apiKey) {
+    throw new Error("설정에서 Anthropic API 키를 먼저 입력해주세요.");
   }
-  streakEl.innerText = streak > 0 ? `🔥 연속 ${streak}일째 학습 중` : "오늘도 10분, 시작해볼까요?";
-}
 
-async function runFrom(startIndex) {
-  for (let i = startIndex; i < sequence.length; i++) {
-    if (!isPlaying) {
-      currentStep = i;
-      return;
+  const mealLabel = MEAL_LABELS[meal];
+  const body = {
+    model,
+    max_tokens: 1024,
+    system:
+      "당신은 사진을 보고 음식의 영양 성분을 추정하는 영양 분석 도우미입니다. " +
+      "사진에 보이는 음식 종류와 대략적인 양(그릇 크기, 두께 등)을 근거로 " +
+      "칼로리, 탄수화물, 단백질, 지방을 한국 음식 기준으로 현실적으로 추정하세요. " +
+      "정확한 수치를 알 수 없으므로 합리적인 추정치를 제시하고, 불확실하면 confidence를 낮게 설정하세요.",
+    output_config: {
+      effort: "low",
+      format: { type: "json_schema", schema: NUTRITION_SCHEMA },
+    },
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: "image/jpeg", data: base64Image },
+          },
+          {
+            type: "text",
+            text: `이 사진은 오늘의 '${mealLabel}' 식사입니다. 음식을 분석해서 칼로리와 탄수화물/단백질/지방(g)을 추정해주세요.`,
+          },
+        ],
+      },
+    ],
+  };
+
+  let response;
+  try {
+    response = await fetch(API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    throw new Error("네트워크 오류로 분석에 실패했어요. 인터넷 연결을 확인해주세요.");
+  }
+
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const errJson = await response.json();
+      detail = errJson?.error?.message || "";
+    } catch (e) {
+      // ignore parse failure
     }
-    const step = sequence[i];
-    currentStep = i;
-    updateProgress();
-
-    if (step.type === "text") {
-      statusEl.innerText = step.lang === KO ? "진행 중" : `진행 중 (${step.lang})`;
-      textEl.innerText = step.text;
-      await speak(step.text, step.lang, step.rate);
-    } else if (step.type === "pause") {
-      statusEl.innerText = "🗣️ 따라 읽는 시간 (무음)";
-      await sleep(step.duration);
+    if (response.status === 401) {
+      throw new Error("API 키가 올바르지 않아요. 설정에서 다시 확인해주세요.");
     }
+    if (response.status === 429) {
+      throw new Error("요청이 많아 잠시 제한됐어요. 잠시 후 다시 시도해주세요.");
+    }
+    throw new Error(`분석 요청이 실패했어요. (${response.status}) ${detail}`);
   }
 
-  if (isPlaying) {
-    currentStep = sequence.length;
-    updateProgress();
-    statusEl.innerText = "학습 완료";
-    textEl.innerText = "오늘의 출근길 10분 학습 완료!";
-    btn.innerText = "▶ 다시 시작하기";
-    isPlaying = false;
-    releaseWakeLock();
-    markTodayCompleted();
-    currentStep = 0;
+  const data = await response.json();
+  if (data.stop_reason === "refusal") {
+    throw new Error("모델이 이 사진 분석을 거부했어요. 다른 사진으로 시도해주세요.");
   }
+  const textBlock = (data.content || []).find((b) => b.type === "text");
+  if (!textBlock) {
+    throw new Error("분석 결과를 읽을 수 없어요. 다시 시도해주세요.");
+  }
+  return JSON.parse(textBlock.text);
 }
 
-function togglePlay() {
-  if (!isPlaying) {
-    if (currentStep >= sequence.length) currentStep = 0;
-    isPlaying = true;
-    btn.innerText = "⏸️ 일시 정지";
-    requestWakeLock();
-    runFrom(currentStep);
-  } else {
-    isPlaying = false;
-    window.speechSynthesis.cancel();
-    btn.innerText = currentStep > 0 ? "▶ 이어서 재생" : "▶ 학습 시작하기";
-    statusEl.innerText = "일시 정지됨";
-    releaseWakeLock();
-  }
+// ---- 렌더링 ----
+function renderResult(meal, result) {
+  const el = document.getElementById(`result-${meal}`);
+  const advice = mealAdvice(meal, result);
+  el.innerHTML = `
+    <div class="food-name">${escapeHtml(result.food_name)}</div>
+    <div class="macro-grid">
+      <div class="macro-chip"><span class="v">${Math.round(result.calories)}</span><span class="l">kcal</span></div>
+      <div class="macro-chip"><span class="v">${Math.round(result.carbs)}g</span><span class="l">탄수화물</span></div>
+      <div class="macro-chip"><span class="v">${Math.round(result.protein)}g</span><span class="l">단백질</span></div>
+      <div class="macro-chip"><span class="v">${Math.round(result.fat)}g</span><span class="l">지방</span></div>
+    </div>
+    <div class="note">${escapeHtml(result.note)}<br>${escapeHtml(advice)}</div>
+  `;
+  el.classList.add("visible");
 }
 
-daySelect.addEventListener("change", () => {
-  isPlaying = false;
-  window.speechSynthesis.cancel();
-  releaseWakeLock();
-  loadDay(Number(daySelect.value));
-});
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str == null ? "" : String(str);
+  return div.innerHTML;
+}
 
-btn.addEventListener("click", togglePlay);
+function computeTotals(log) {
+  const totals = { calories: 0, carbs: 0, protein: 0, fat: 0 };
+  MEALS.forEach((meal) => {
+    const r = log[meal];
+    if (!r) return;
+    totals.calories += Number(r.calories) || 0;
+    totals.carbs += Number(r.carbs) || 0;
+    totals.protein += Number(r.protein) || 0;
+    totals.fat += Number(r.fat) || 0;
+  });
+  return totals;
+}
 
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && isPlaying) {
-    if (wakeLock === null) requestWakeLock();
-    if (noSleepVideo && noSleepVideo.paused) noSleepVideo.play().catch(() => {});
-  }
-});
+function renderSummary() {
+  const log = loadTodayLog();
+  const totals = computeTotals(log);
+  const target = getTarget();
 
-populateDaySelect();
-loadDay(0);
-renderStreak();
+  document.getElementById("summary-date").textContent = todayKey();
+  document.getElementById("sum-cal").textContent = Math.round(totals.calories);
+  document.getElementById("sum-carb").textContent = `${Math.round(totals.carbs)}g`;
+  document.getElementById("sum-protein").textContent = `${Math.round(totals.protein)}g`;
+  document.getElementById("sum-fat").textContent = `${Math.round(totals.fat)}g`;
+
+  const adviceList = document.getElementById("advice-list");
+  adviceList.innerHTML = "";
+  const hasAnyMeal = MEALS.some((m) => log[m]);
+  const messages = hasAnyMeal
+    ? macroAdvice(totals, target)
+    : ["아침·점심·저녁 사진을 올리면 하루 영양 균형을 분석해드려요."];
+  messages.forEach((msg) => {
+    const li = document.createElement("li");
+    li.textContent = msg;
+    adviceList.appendChild(li);
+  });
+}
+
+function restoreMealFromLog(meal) {
+  const log = loadTodayLog();
+  const result = log[meal];
+  if (!result) return;
+  state.results[meal] = result;
+  renderResult(meal, result);
+  document.getElementById(`upload-${meal}`).innerHTML = `<span class="placeholder">✅ 오늘 분석 완료 (다시 올리려면 탭하세요)</span>`;
+}
+
+// ---- 이벤트 바인딩 ----
+function setupMealCard(meal) {
+  const fileInput = document.getElementById(`file-${meal}`);
+  const uploadArea = document.getElementById(`upload-${meal}`);
+  const analyzeBtn = document.getElementById(`analyze-${meal}`);
+  const clearBtn = document.getElementById(`clear-${meal}`);
+  const statusEl = document.getElementById(`status-${meal}`);
+  const resultEl = document.getElementById(`result-${meal}`);
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    state.files[meal] = file;
+    const url = URL.createObjectURL(file);
+    uploadArea.innerHTML = `<img src="${url}" alt="${MEAL_LABELS[meal]} 사진 미리보기">`;
+    uploadArea.appendChild(fileInput);
+    analyzeBtn.disabled = false;
+    statusEl.textContent = "";
+    statusEl.classList.remove("error");
+    resultEl.classList.remove("visible");
+  });
+
+  analyzeBtn.addEventListener("click", async () => {
+    const file = state.files[meal];
+    if (!file) return;
+    analyzeBtn.disabled = true;
+    statusEl.classList.remove("error");
+    statusEl.textContent = "🔍 사진을 분석하고 있어요...";
+
+    try {
+      const base64 = await fileToResizedBase64(file);
+      const result = await analyzeMeal(meal, base64);
+      state.results[meal] = result;
+
+      const log = loadTodayLog();
+      log[meal] = result;
+      saveTodayLog(log);
+
+      renderResult(meal, result);
+      renderSummary();
+      statusEl.textContent = "분석 완료!";
+    } catch (e) {
+      statusEl.textContent = e.message || "분석 중 오류가 발생했어요.";
+      statusEl.classList.add("error");
+    } finally {
+      analyzeBtn.disabled = false;
+    }
+  });
+
+  clearBtn.addEventListener("click", () => {
+    delete state.files[meal];
+    delete state.results[meal];
+    fileInput.value = "";
+    uploadArea.innerHTML = `<span class="placeholder">탭해서 사진 선택</span>`;
+    uploadArea.appendChild(fileInput);
+    analyzeBtn.disabled = true;
+    statusEl.textContent = "";
+    statusEl.classList.remove("error");
+    resultEl.classList.remove("visible");
+    resultEl.innerHTML = "";
+
+    const log = loadTodayLog();
+    delete log[meal];
+    saveTodayLog(log);
+    renderSummary();
+  });
+}
+
+function setupSettings() {
+  const toggle = document.getElementById("settings-toggle");
+  const panel = document.getElementById("settings-panel");
+  const apiKeyInput = document.getElementById("api-key");
+  const presetSelect = document.getElementById("target-preset");
+  const modelSelect = document.getElementById("model-select");
+
+  toggle.addEventListener("click", () => {
+    panel.classList.toggle("open");
+  });
+
+  Object.entries(TARGET_PRESETS).forEach(([key, preset]) => {
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = preset.label;
+    presetSelect.appendChild(opt);
+  });
+
+  const settings = getSettings();
+  apiKeyInput.value = settings.apiKey;
+  presetSelect.value = settings.presetKey;
+  modelSelect.value = settings.model;
+
+  apiKeyInput.addEventListener("input", () => {
+    localStorage.setItem("mealApiKey", apiKeyInput.value.trim());
+  });
+  presetSelect.addEventListener("change", () => {
+    localStorage.setItem("mealTargetPreset", presetSelect.value);
+    renderSummary();
+  });
+  modelSelect.addEventListener("change", () => {
+    localStorage.setItem("mealModel", modelSelect.value);
+  });
+}
+
+MEALS.forEach(setupMealCard);
+setupSettings();
+MEALS.forEach(restoreMealFromLog);
+renderSummary();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {

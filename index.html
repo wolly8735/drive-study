@@ -3,103 +3,288 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#121212">
-  <meta name="description" content="출근길 10분, 4개 국어(영어/중국어/일본어/스페인어) 단어를 소리로 따라 읽는 무료 섀도잉 학습 웹앱">
+  <meta name="theme-color" content="#0e7c5f">
+  <meta name="description" content="아침·점심·저녁 식단 사진을 올리면 AI가 탄수화물·단백질·지방·칼로리를 분석하고 부족한 영양소를 알려주는 무료 식단 분석 앱">
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="icon" href="icons/icon-192.png">
-  <title>출근길 10분 섀도잉</title>
+  <title>오늘의 식단 분석</title>
   <style>
     * { box-sizing: border-box; }
     body {
-      background-color: #121212;
-      color: #ffffff;
+      background-color: #f4f6f4;
+      color: #1c231f;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
       margin: 0;
-      padding: 20px;
+      padding: 16px 12px 40px;
+      max-width: 480px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    h1 {
+      font-size: 1.35rem;
+      color: #0e7c5f;
       text-align: center;
+      margin: 6px 0 2px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #667;
+      font-size: 0.85rem;
+      margin-bottom: 16px;
     }
     .card {
-      background-color: #1e1e1e;
-      border-radius: 20px;
-      padding: 30px 20px;
-      width: 100%;
-      max-width: 400px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
     }
-    h1 { font-size: 1.5rem; color: #4da6ff; margin-bottom: 6px; }
-    #streak { font-size: 0.9rem; color: #ff9f4d; margin-bottom: 14px; }
-    #day-select {
-      background: #2a2a2a;
-      color: #fff;
-      border: 1px solid #3a3a3a;
-      border-radius: 10px;
-      padding: 8px 12px;
-      font-size: 0.95rem;
-      margin-bottom: 16px;
+    .card h2 {
+      font-size: 1rem;
+      margin: 0 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
-    #status { font-size: 1.1rem; color: #aaa; margin-bottom: 20px; }
-    #text-display {
-      font-size: 1.3rem;
-      font-weight: bold;
-      min-height: 100px;
+    .meal-badge {
+      font-size: 0.75rem;
+      color: #0e7c5f;
+      background: #e5f5ef;
+      padding: 3px 10px;
+      border-radius: 999px;
+    }
+    .upload-area {
+      border: 2px dashed #cfd8d3;
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      min-height: 90px;
       display: flex;
       align-items: center;
       justify-content: center;
-      word-break: keep-all;
-      line-height: 1.5;
-      margin-bottom: 16px;
-    }
-    #progress-track {
-      width: 100%;
-      height: 6px;
-      background: #2a2a2a;
-      border-radius: 3px;
-      margin-bottom: 24px;
+      color: #8a948d;
+      font-size: 0.9rem;
       overflow: hidden;
     }
-    #progress-bar {
-      height: 100%;
-      width: 0%;
-      background: #4da6ff;
-      transition: width 0.3s ease;
-    }
-    button {
-      background-color: #4da6ff;
-      color: #121212;
-      border: none;
-      padding: 18px 40px;
-      font-size: 1.2rem;
-      font-weight: bold;
-      border-radius: 50px;
-      width: 100%;
+    .upload-area input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
       cursor: pointer;
     }
-    button:active { transform: scale(0.98); }
-    footer {
-      margin-top: 18px;
+    .upload-area img {
+      max-width: 100%;
+      max-height: 220px;
+      border-radius: 8px;
+    }
+    .meal-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .btn-primary {
+      background: #0e7c5f;
+      color: #fff;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      flex: 1;
+    }
+    .btn-primary:disabled {
+      background: #a9c9bd;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: #eef1ee;
+      color: #444;
+      padding: 10px 14px;
+      font-size: 0.85rem;
+    }
+    .result {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #eef1ee;
+      font-size: 0.88rem;
+      display: none;
+    }
+    .result.visible { display: block; }
+    .result .food-name {
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .macro-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+      margin: 8px 0;
+    }
+    .macro-chip {
+      background: #f7f9f7;
+      border-radius: 8px;
+      padding: 6px 4px;
+      text-align: center;
+    }
+    .macro-chip .v { font-weight: 700; font-size: 0.95rem; display: block; }
+    .macro-chip .l { font-size: 0.68rem; color: #7a847d; }
+    .result .note { color: #556; font-size: 0.82rem; line-height: 1.4; }
+    .status-text { font-size: 0.82rem; color: #0e7c5f; margin-top: 8px; }
+    .status-text.error { color: #c0392b; }
+
+    #summary-card { background: #0e7c5f; color: #fff; }
+    #summary-card h2 { color: #fff; }
+    #summary-card .meal-badge { background: rgba(255,255,255,0.2); color: #fff; }
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 10px 0;
+    }
+    .summary-chip {
+      background: rgba(255,255,255,0.15);
+      border-radius: 10px;
+      padding: 8px 4px;
+      text-align: center;
+    }
+    .summary-chip .v { font-weight: 700; font-size: 1.05rem; display: block; }
+    .summary-chip .l { font-size: 0.7rem; opacity: 0.85; }
+    .advice-list {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .advice-list li { margin-bottom: 4px; }
+
+    #settings-toggle {
+      display: block;
+      width: 100%;
+      text-align: center;
+      background: none;
+      color: #667;
+      font-size: 0.8rem;
+      padding: 8px;
+      text-decoration: underline;
+    }
+    #settings-panel { display: none; }
+    #settings-panel.open { display: block; }
+    label { display: block; font-size: 0.82rem; color: #444; margin: 10px 0 4px; }
+    input[type="text"], input[type="password"], select {
+      width: 100%;
+      padding: 9px 10px;
+      border-radius: 8px;
+      border: 1px solid #d8ddd9;
+      font-size: 0.9rem;
+      background: #fff;
+    }
+    .hint {
       font-size: 0.75rem;
-      color: #555;
+      color: #8a948d;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    footer {
+      text-align: center;
+      font-size: 0.72rem;
+      color: #97a19a;
+      margin-top: 20px;
+      line-height: 1.5;
     }
   </style>
 </head>
 <body>
 
-<div class="card">
-  <h1>🚗 출근길 10분 섀도잉</h1>
-  <div id="streak">오늘도 10분, 시작해볼까요?</div>
-  <select id="day-select" aria-label="학습일 선택"></select>
-  <div id="status">준비 완료</div>
-  <div id="text-display">아래 버튼을 누르면 출근길 10분 학습이 시작됩니다.</div>
-  <div id="progress-track"><div id="progress-bar"></div></div>
-  <button id="btn">▶ 학습 시작하기</button>
-  <footer>화면이 꺼지면 음성이 계속 재생되지 않을 수 있어요. 운전 중에는 거치대에 화면이 보이도록 두세요.</footer>
+<h1>🍽️ 오늘의 식단 분석</h1>
+<div class="subtitle">아침·점심·저녁 사진을 올리면 AI가 영양소를 분석해드려요</div>
+
+<div id="summary-card" class="card">
+  <h2>오늘 합계 <span class="meal-badge" id="summary-date"></span></h2>
+  <div class="summary-grid">
+    <div class="summary-chip"><span class="v" id="sum-cal">0</span><span class="l">kcal</span></div>
+    <div class="summary-chip"><span class="v" id="sum-carb">0g</span><span class="l">탄수화물</span></div>
+    <div class="summary-chip"><span class="v" id="sum-protein">0g</span><span class="l">단백질</span></div>
+    <div class="summary-chip"><span class="v" id="sum-fat">0g</span><span class="l">지방</span></div>
+  </div>
+  <ul class="advice-list" id="advice-list"></ul>
 </div>
+
+<div class="card" data-meal="breakfast">
+  <h2>아침 <span class="meal-badge">Breakfast</span></h2>
+  <div class="upload-area" id="upload-breakfast">
+    <span class="placeholder">탭해서 사진 선택</span>
+    <input type="file" accept="image/*" capture="environment" id="file-breakfast">
+  </div>
+  <div class="meal-actions">
+    <button class="btn-primary" id="analyze-breakfast" disabled>분석하기</button>
+    <button class="btn-secondary" id="clear-breakfast">지우기</button>
+  </div>
+  <div class="status-text" id="status-breakfast"></div>
+  <div class="result" id="result-breakfast"></div>
+</div>
+
+<div class="card" data-meal="lunch">
+  <h2>점심 <span class="meal-badge">Lunch</span></h2>
+  <div class="upload-area" id="upload-lunch">
+    <span class="placeholder">탭해서 사진 선택</span>
+    <input type="file" accept="image/*" capture="environment" id="file-lunch">
+  </div>
+  <div class="meal-actions">
+    <button class="btn-primary" id="analyze-lunch" disabled>분석하기</button>
+    <button class="btn-secondary" id="clear-lunch">지우기</button>
+  </div>
+  <div class="status-text" id="status-lunch"></div>
+  <div class="result" id="result-lunch"></div>
+</div>
+
+<div class="card" data-meal="dinner">
+  <h2>저녁 <span class="meal-badge">Dinner</span></h2>
+  <div class="upload-area" id="upload-dinner">
+    <span class="placeholder">탭해서 사진 선택</span>
+    <input type="file" accept="image/*" capture="environment" id="file-dinner">
+  </div>
+  <div class="meal-actions">
+    <button class="btn-primary" id="analyze-dinner" disabled>분석하기</button>
+    <button class="btn-secondary" id="clear-dinner">지우기</button>
+  </div>
+  <div class="status-text" id="status-dinner"></div>
+  <div class="result" id="result-dinner"></div>
+</div>
+
+<button id="settings-toggle">⚙️ API 키 / 목표 설정</button>
+<div class="card" id="settings-panel">
+  <label for="api-key">Anthropic API 키</label>
+  <input type="password" id="api-key" placeholder="sk-ant-...">
+  <div class="hint">
+    키는 이 기기의 브라우저에만 저장되고, 분석 시 사진과 함께 Anthropic 서버로 직접 전송됩니다.
+    (별도의 자체 서버를 거치지 않습니다.) API 키는
+    <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">Anthropic 콘솔</a>에서
+    발급받을 수 있어요.
+  </div>
+
+  <label for="target-preset">하루 목표치</label>
+  <select id="target-preset"></select>
+  <div class="hint">본인의 활동량/목표에 맞는 기준을 선택하면 조언이 더 정확해져요.</div>
+
+  <label for="model-select">분석 모델</label>
+  <select id="model-select">
+    <option value="claude-opus-5">Claude Opus 5 (가장 정확, 비용 높음)</option>
+    <option value="claude-sonnet-5">Claude Sonnet 5 (균형)</option>
+    <option value="claude-haiku-4-5">Claude Haiku 4.5 (빠르고 저렴)</option>
+  </select>
+</div>
+
+<footer>
+  사진과 API 키는 브라우저에서 Anthropic API로 직접 전송되며, 이 앱을 만든 개발자는 어떤 데이터도 수집하지 않습니다.<br>
+  AI 분석 결과는 추정치이며 실제 영양 성분과 차이가 있을 수 있습니다.
+</footer>
 
 <script src="data.js"></script>
 <script src="app.js"></script>

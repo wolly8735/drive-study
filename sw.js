@@ -1,4 +1,4 @@
-const CACHE_NAME = "commute-shadowing-v1";
+const CACHE_NAME = "meal-analysis-v1";
 const ASSETS = [
   "./",
   "./index.html",
@@ -26,7 +26,12 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  // API 호출(POST, 외부 도메인)은 서비스 워커 캐시를 거치지 않고 그대로 통과시킵니다.
+  if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) {
+    return;
+  }
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(req).then((cached) => cached || fetch(req))
   );
 });
