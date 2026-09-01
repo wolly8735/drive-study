@@ -1,4 +1,4 @@
-const CACHE_NAME = "commute-shadowing-v1";
+const CACHE_NAME = "commute-shadowing-v2";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,6 +7,9 @@ const ASSETS = [
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
+  "./zh-ebook/index.html",
+  "./zh-ebook/app.js",
+  "./zh-ebook/data.js",
 ];
 
 self.addEventListener("install", (event) => {
